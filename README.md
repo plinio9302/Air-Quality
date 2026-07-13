@@ -96,7 +96,7 @@ Benzene exceeded safe levels on 97% of days in the study — a serious public he
 Aggregated average pollutant concentrations by hour of day to identify peak pollution windows, expected to align with morning and evening rush hours (07:00-09:00 and 17:00-20:00).
 
 ### Query 5 - Temperature vs. Pollutant Levels
-Bucketed temperature into four ranges and compared average pollutant concentrations across buckets. Cold temperatures reduce atmospheric mixing, causing pollutants to accumulate near ground level — tested and confirmed by the data.
+Bucketed temperature into four ranges (`< 5C`, `5-15C`, `15-25C`, `>= 25C`) and compared average pollutant concentrations across buckets, to test the hypothesis that cold temperatures reduce atmospheric mixing and cause pollutants to accumulate near ground level.
 
 ---
 
@@ -114,4 +114,4 @@ Bucketed temperature into four ranges and compared average pollutant concentrati
 - Benzene concentrations exceeded WHO guidelines on 97% of days, indicating persistent air quality issues in this area of Italy.
 - Pollution levels follow a strong seasonal pattern, peaking in winter months due to heating activity and reduced atmospheric mixing.
 - CO levels remained within safe limits on most days, with only 3 exceedances over the 390-day period.
-- Cold temperatures correlate with higher pollutant concentrations, consistent with known atmospheric boundary layer dynamics.
+- Monthly CO peaked in December 2004 (2.75 mg/m^3) and Benzene peaked in October 2004 (13.08 microg/m^3); April 2005 posted the lowest monthly average for all three focal pollutants, consistent with warmer-weather atmospheric mixing.

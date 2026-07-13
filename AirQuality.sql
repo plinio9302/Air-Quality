@@ -74,7 +74,7 @@ the EDA below establishes a strong foundation for understanding
 air quality patterns in this region of Italy.
 */
 
-USE case_study_hmw;
+USE air_quality_case_study;
 
 -- =============================================================================
 -- PART 2 - EXPLORATORY DATA ANALYSIS (7-STEP FRAMEWORK)
@@ -170,6 +170,8 @@ SELECT
     MIN(NULLIF(`CO(GT)`,   -200))    AS min_co,
     MAX(NULLIF(`CO(GT)`,   -200))    AS max_co
 FROM airqualityuci;
+-- NOTE: distinct_values counts -200 as one of its own distinct values;
+-- MIN/MAX use NULLIF so the reported range excludes it. Same applies below.
 -- 96 distinct values | Range: 0 to 11.9 mg/m^3 (excluding -200 placeholders)
 
 -- C6H6(GT): Benzene concentration [microg/m^3]
@@ -461,7 +463,7 @@ SELECT
         WHEN temperature < 5  THEN '1 - Very Cold (< 5 C)'
         WHEN temperature < 15 THEN '2 - Cold     (5-15 C)'
         WHEN temperature < 25 THEN '3 - Mild    (15-25 C)'
-        ELSE                       '4 - Warm     (> 25 C)'
+        ELSE                       '4 - Warm    (>= 25 C)'
     END                            AS temp_bucket,
     COUNT(*)                       AS observations,
     ROUND(AVG(co_gt),      2)      AS avg_co,
@@ -485,8 +487,4 @@ INTERPRETATION:
 
 -- =============================================================================
 -- END OF CASE STUDY
-<<<<<<< HEAD
 -- =============================================================================
-=======
--- =============================================================================
->>>>>>> c92a1d9173c39e2f8331f2e8d03127efbb1f3164
