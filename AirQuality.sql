@@ -74,7 +74,7 @@ the EDA below establishes a strong foundation for understanding
 air quality patterns in this region of Italy.
 */
 
-USE case_study_hmw;
+USE air_quality_case_study;
 
 -- =============================================================================
 -- PART 2 - EXPLORATORY DATA ANALYSIS (7-STEP FRAMEWORK)
@@ -170,6 +170,8 @@ SELECT
     MIN(NULLIF(`CO(GT)`,   -200))    AS min_co,
     MAX(NULLIF(`CO(GT)`,   -200))    AS max_co
 FROM airqualityuci;
+-- NOTE: distinct_values counts -200 as one of its own distinct values;
+-- MIN/MAX use NULLIF so the reported range excludes it. Same applies below.
 -- 96 distinct values | Range: 0 to 11.9 mg/m^3 (excluding -200 placeholders)
 
 -- C6H6(GT): Benzene concentration [microg/m^3]
@@ -178,7 +180,10 @@ SELECT
     MIN(NULLIF(`C6H6(GT)`, -200))    AS min_benzene,
     MAX(NULLIF(`C6H6(GT)`, -200))    AS max_benzene
 FROM airqualityuci;
--- 398 distinct values | Range: 0 to 9.9 microg/m^3
+-- CORRECTED (previously misreported as "398 distinct values | Range: 0 to
+-- 9.9 microg/m^3" -- independently re-verified against the raw CSV via
+-- Python/pandas, see analysis/run_analysis.py):
+-- 408 distinct values | Range: 0.1 to 63.7 microg/m^3 (excluding -200 placeholders)
 
 -- NO2(GT): Nitrogen Dioxide concentration [microg/m^3]
 SELECT
@@ -245,12 +250,22 @@ FROM airqualityuci;
 /*
 RESULTS:
   CO(GT)   : 1,683 missing out of 9,357 (18.0%)
-  C6H6(GT) : 1,639 missing out of 9,357 (17.5%)
+  C6H6(GT) :   366 missing out of 9,357 (3.9%)   -- CORRECTED, see note below
   NO2(GT)  : 1,642 missing out of 9,357 (17.5%)
 
-Missing values are substantial (~17-18%) and likely occur during
-sensor maintenance or calibration windows. All analysis queries
-exclude these placeholders using NULLIF(column, -200).
+CORRECTION: this line previously read "C6H6(GT): 1,639 missing (17.5%)".
+That figure is actually the missing-value count for NOx(GT), a different
+column -- an apparent copy-paste error, caught by independently
+recomputing every column's -200 count in analysis/run_analysis.py
+(NOx(GT) genuinely has 1,639 missing values; Benzene has 366). This means
+Benzene's readings are far more complete than originally documented,
+which if anything makes the Query 3 finding (Benzene exceeding its WHO
+threshold on ~97% of days) more trustworthy, not less, since it isn't
+resting on a mostly-imputed column.
+
+Missing values for CO(GT) and NO2(GT) are substantial (~17-18%) and
+likely occur during sensor maintenance or calibration windows. All
+analysis queries exclude -200 placeholders using NULLIF(column, -200).
 */
 
 
@@ -347,7 +362,10 @@ FROM airquality_clean
 GROUP BY year_month
 ORDER BY avg_benzene DESC
 LIMIT 1;
--- Result: 2004-10, avg Benzene = 13.08 microg/m^3
+-- Result: 2004-10, avg Benzene = 13.53 microg/m^3
+-- (CORRECTED from a previously reported 13.08 -- independently
+-- recomputed via analysis/run_analysis.py against this exact query logic;
+-- consistent with the Step 4 / Step 7 Benzene corrections above.)
 
 -- Benzene: Lowest monthly average
 SELECT DATE_FORMAT(date_clean, '%Y-%m') AS year_month,
@@ -356,7 +374,7 @@ FROM airquality_clean
 GROUP BY year_month
 ORDER BY avg_benzene ASC
 LIMIT 1;
--- Result: 2005-04, avg Benzene = 3.83 microg/m^3
+-- Result: 2005-04, avg Benzene = 4.29 microg/m^3 (CORRECTED from 3.83)
 
 -- NO2: Highest monthly average
 SELECT DATE_FORMAT(date_clean, '%Y-%m') AS year_month,
@@ -407,9 +425,13 @@ FROM airquality_clean;
 
 /*
 INTERPRETATION:
-- Benzene exceeded its threshold on 378 out of 390 days (97% of the study period).
-  This is a serious public health concern, as chronic Benzene exposure
-  is linked to leukemia and other blood disorders.
+- Benzene exceeded its threshold on 380 out of 391 distinct calendar days
+  (97.2% of the study period; previously reported as 378/390, 97% -- the
+  updated distinct-day count of 391 reflects the inclusive span 2004-03-10
+  to 2005-04-04, and 380 was independently recomputed via
+  analysis/run_analysis.py). Same conclusion either way: this is a
+  serious public health concern, as chronic Benzene exposure is linked
+  to leukemia and other blood disorders.
 - NO2 exceeded its threshold on 87 days (~22%), concentrated in winter months.
 - CO exceeded its threshold on only 3 days, suggesting CO levels
   were generally within safe limits in this area during the study period.
@@ -461,7 +483,7 @@ SELECT
         WHEN temperature < 5  THEN '1 - Very Cold (< 5 C)'
         WHEN temperature < 15 THEN '2 - Cold     (5-15 C)'
         WHEN temperature < 25 THEN '3 - Mild    (15-25 C)'
-        ELSE                       '4 - Warm     (> 25 C)'
+        ELSE                       '4 - Warm    (>= 25 C)'
     END                            AS temp_bucket,
     COUNT(*)                       AS observations,
     ROUND(AVG(co_gt),      2)      AS avg_co,
@@ -485,8 +507,4 @@ INTERPRETATION:
 
 -- =============================================================================
 -- END OF CASE STUDY
-<<<<<<< HEAD
 -- =============================================================================
-=======
--- =============================================================================
->>>>>>> c92a1d9173c39e2f8331f2e8d03127efbb1f3164

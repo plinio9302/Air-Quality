@@ -1,12 +1,14 @@
 # Air Quality Case Study
 
+**🔗 Live dashboard:** [plinio9302.github.io/Air-Quality](https://plinio9302.github.io/Air-Quality/)
+
 **Author:** Plinio Durango | **Tool:** MySQL | **Dataset:** UCI Air Quality
 
 ---
 
 ## Overview
 
-This case study analyzes hourly air quality measurements collected by a gas multisensor device deployed in a heavily polluted area of an Italian city. The data spans 390 days (March 2004 - April 2005) and captures both low-cost metal oxide sensor responses and ground-truth concentrations from a certified reference analyzer.
+This case study analyzes hourly air quality measurements collected by a gas multisensor device deployed in a heavily polluted area of an Italian city. The data spans 391 days (March 2004 - April 2005) and captures both low-cost metal oxide sensor responses and ground-truth concentrations from a certified reference analyzer.
 
 The analysis focuses on three key pollutants and explores seasonal trends, peak pollution hours, threshold exceedances, and the relationship between temperature and pollutant levels.
 
@@ -20,7 +22,7 @@ The analysis focuses on three key pollutants and explores seasonal trends, peak 
 |---|---|
 | Rows | 9,357 hourly observations |
 | Columns | 15 (after removing 2 empty trailing columns) |
-| Period | 2004-03-10 to 2005-04-04 (390 days) |
+| Period | 2004-03-10 to 2005-04-04 (391 distinct calendar days) |
 | Unique identifier | (Date, Time) composite key |
 
 ### Key Columns
@@ -39,10 +41,25 @@ The analysis focuses on three key pollutants and explores seasonal trends, peak 
 
 ```
 Air-Quality/
-├── AirQuality.sql       # Full case study: EDA, data cleaning view & analysis queries
-├── AirQualityUCI.csv    # Raw dataset from UCI repository
-└── README.md
+├── AirQuality.sql                 # Full case study: EDA, data cleaning view & analysis queries
+├── AirQualityUCI.csv              # Raw dataset from UCI repository
+├── README.md                      # This file
+└── analysis/
+    ├── run_analysis.py            # Python + SQLite reproduction of the SQL analysis
+    ├── dashboard_template.html    # Dashboard HTML template (data injected at build time)
+    └── output/                    # Generated CSVs + dashboard_data.json
 ```
+
+---
+
+## A data-quality catch worth calling out
+
+Independently reproducing this analysis in Python (`analysis/run_analysis.py`, verified directly against the raw CSV) surfaced two errors in the original SQL comments/README for the **Benzene (C6H6(GT))** column specifically — CO(GT) and NO2(GT) check out exactly as documented:
+
+1. **Missing-value count.** The SQL file's Step 7 EDA reported "C6H6(GT): 1,639 missing (17.5%)." That figure is actually the missing-value count for `NOx(GT)`, a different column — an apparent copy-paste error. Benzene's real missing count is **366 (3.9%)**, far more complete than documented. If anything, this makes the Query 3 finding (Benzene exceeding its WHO threshold on ~97% of days) *more* trustworthy, since it isn't resting on a mostly-imputed column.
+2. **Value range.** Step 4's EDA reported Benzene's range as "0 to 9.9 microg/m^3." The actual range (with -200 placeholders excluded) is **0.1 to 63.7 microg/m^3** — the 9.9 ceiling was likely a stale figure from an early exploratory pass before the full range of hourly spikes was visible.
+
+Both corrections are documented inline in `AirQuality.sql` and reflected in the Analysis section below. They also shift two downstream numbers: the October 2004 Benzene peak recomputes to 13.53 microg/m^3 (previously 13.08) and the April 2005 low to 4.29 (previously 3.83) — the WHO exceedance-days count for Benzene also recomputes to 380 of 391 days (97.2%, previously reported as 378 of 390, 97%) — same conclusion, tighter numbers.
 
 ---
 
@@ -62,7 +79,7 @@ All analysis queries reference this view instead of the raw table.
 1. Two empty trailing columns from CSV import (dropped via ALTER TABLE)
 2. Numeric columns CO(GT), C6H6(GT), T, RH, AH stored as TEXT — corrected with ALTER TABLE MODIFY COLUMN
 3. Date column in dd/mm/YYYY format — incompatible with native SQL date functions
-4. Missing values encoded as -200 (~17-18% across all three focal pollutants)
+4. Missing values encoded as -200: 18.0% for CO(GT), 3.9% for C6H6(GT)/Benzene, 17.5% for NO2(GT) — see the data-quality catch above for how the Benzene figure was corrected
 5. No explicit primary key — (Date, Time) used as composite identifier
 
 ---
@@ -78,7 +95,7 @@ Identified the month with the highest and lowest average for each pollutant:
 | Pollutant | Highest Month | Lowest Month |
 |---|---|---|
 | CO (mg/m^3) | Dec 2004 (2.75) | Apr 2005 (1.21) |
-| Benzene (microg/m^3) | Oct 2004 (13.08) | Apr 2005 (3.83) |
+| Benzene (microg/m^3) | Oct 2004 (13.53) | Apr 2005 (4.29) |
 | NO2 (microg/m^3) | Feb 2005 (160.69) | Aug 2004 (70.10) |
 
 ### Query 3 - WHO Threshold Exceedances
@@ -88,15 +105,15 @@ Counted days where hourly readings exceeded WHO Air Quality Guidelines:
 |---|---|---|---|
 | CO | > 10 mg/m^3 | 3 days | 0.8% |
 | NO2 | > 200 microg/m^3 | 87 days | 22.3% |
-| Benzene | > 5 microg/m^3 | 378 days | 97% |
+| Benzene | > 5 microg/m^3 | 380 days | 97.2% |
 
-Benzene exceeded safe levels on 97% of days in the study — a serious public health concern given its links to leukemia and blood disorders.
+Benzene exceeded safe levels on 97.2% of days in the study — a serious public health concern given its links to leukemia and blood disorders.
 
 ### Query 4 - Hourly Pollution Patterns
 Aggregated average pollutant concentrations by hour of day to identify peak pollution windows, expected to align with morning and evening rush hours (07:00-09:00 and 17:00-20:00).
 
 ### Query 5 - Temperature vs. Pollutant Levels
-Bucketed temperature into four ranges and compared average pollutant concentrations across buckets. Cold temperatures reduce atmospheric mixing, causing pollutants to accumulate near ground level — tested and confirmed by the data.
+Bucketed temperature into four ranges (`< 5C`, `5-15C`, `15-25C`, `>= 25C`) and compared average pollutant concentrations across buckets, to test the hypothesis that cold temperatures reduce atmospheric mixing and cause pollutants to accumulate near ground level.
 
 ---
 
@@ -104,14 +121,38 @@ Bucketed temperature into four ranges and compared average pollutant concentrati
 
 | Tool | Purpose |
 |---|---|
-| MySQL | Data cleaning, EDA, view creation, and analysis queries |
+| MySQL | Original data cleaning, EDA, view creation, and analysis queries |
+| Python (pandas, sqlite3) | Reproducible pipeline (no MySQL server required) |
 | SQL (STR_TO_DATE, NULLIF, DATE_FORMAT) | Date parsing, missing value handling, time-series aggregation |
 
 ---
 
 ## Key Findings
 
-- Benzene concentrations exceeded WHO guidelines on 97% of days, indicating persistent air quality issues in this area of Italy.
+- Benzene concentrations exceeded WHO guidelines on 97.2% of days, indicating persistent air quality issues in this area of Italy.
 - Pollution levels follow a strong seasonal pattern, peaking in winter months due to heating activity and reduced atmospheric mixing.
-- CO levels remained within safe limits on most days, with only 3 exceedances over the 390-day period.
-- Cold temperatures correlate with higher pollutant concentrations, consistent with known atmospheric boundary layer dynamics.
+- CO levels remained within safe limits on most days, with only 3 exceedances over the 391-day period.
+- Monthly CO peaked in December 2004 (2.75 mg/m^3) and Benzene peaked in October 2004 (13.53 microg/m^3); April 2005 posted the lowest monthly average for all three focal pollutants, consistent with warmer-weather atmospheric mixing.
+
+---
+
+## Interactive Dashboard (Python + SQL, reproducible)
+
+`index.html` is a self-contained, interactive dashboard (published live via GitHub Pages at the link above) that
+communicates the findings above — open it directly in any browser, no server or install needed.
+
+It's built by `analysis/run_analysis.py`, a heavily-commented Python script that reproduces the MySQL analysis in
+`AirQuality.sql` **without needing a MySQL server**: pandas loads the raw CSV (handling its semicolon delimiter and
+European decimal-comma formatting), `df.to_sql()` pushes it into a local SQLite database, and the same SQL logic
+(the `airquality_clean` view, WHO threshold exceedance counts, monthly/hourly aggregations, and temperature
+bucketing) runs against SQLite instead of MySQL. Every number was independently recomputed against the raw CSV,
+which is what surfaced the two Benzene documentation errors described above.
+
+To regenerate everything from scratch:
+
+```bash
+pip install pandas
+python3 analysis/run_analysis.py     # writes analysis/output/*.csv + dashboard_data.json
+```
+
+Then rebuild the dashboard HTML by embedding the fresh JSON into `analysis/dashboard_template.html`.
